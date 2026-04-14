@@ -1,10 +1,18 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Search, ShoppingCart, Menu, X, Store } from "lucide-react";
+import { Search, ShoppingCart, Menu, X, Store, LogOut, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border/50 bg-card/80 backdrop-blur-xl">
@@ -25,23 +33,36 @@ const Navbar = () => {
           <Link to="/categories" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             Categories
           </Link>
-          <Link to="/sell" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            Start Selling
-          </Link>
+          {user && profile?.role === "seller" && (
+            <Link to="/dashboard" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              Seller Dashboard
+            </Link>
+          )}
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
           <Button variant="ghost" size="icon" className="text-muted-foreground">
             <Search className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
-            <ShoppingCart className="h-5 w-5" />
-          </Button>
-          <Link to="/auth">
-            <Button variant="hero" size="sm">
-              Get Started
-            </Button>
-          </Link>
+          {user ? (
+            <>
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  {profile?.full_name || "Dashboard"}
+                </Button>
+              </Link>
+              <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={handleSignOut}>
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </>
+          ) : (
+            <Link to="/auth">
+              <Button variant="hero" size="sm">
+                Get Started
+              </Button>
+            </Link>
+          )}
         </div>
 
         <Button
@@ -59,10 +80,18 @@ const Navbar = () => {
           <div className="flex flex-col gap-2">
             <Link to="/" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground">Marketplace</Link>
             <Link to="/categories" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground">Categories</Link>
-            <Link to="/sell" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground">Start Selling</Link>
-            <Link to="/auth">
-              <Button variant="hero" size="sm" className="mt-2 w-full">Get Started</Button>
-            </Link>
+            {user ? (
+              <>
+                <Link to="/dashboard" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground">Dashboard</Link>
+                <Button variant="outline" size="sm" className="mt-2 w-full" onClick={handleSignOut}>
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <Link to="/auth">
+                <Button variant="hero" size="sm" className="mt-2 w-full">Get Started</Button>
+              </Link>
+            )}
           </div>
         </div>
       )}
