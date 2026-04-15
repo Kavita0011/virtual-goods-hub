@@ -1,28 +1,65 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import CategoryFilter from "@/components/CategoryFilter";
 import ProductCard from "@/components/ProductCard";
 import FeaturesSection from "@/components/FeaturesSection";
 import Footer from "@/components/Footer";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
-const sampleProducts = [
-  { title: "Professional Resume Template - Modern CV Design", seller: "DesignStudio", price: 999, discountPrice: 499, image: "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=400&h=300&fit=crop", category: "Templates", rating: 4.8 },
-  { title: "Digital Illustration Pack - Anime Characters Vol.1", seller: "AnimeArts", price: 1499, image: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&h=300&fit=crop", category: "Anime Art", rating: 4.9 },
-  { title: "Complete SEO Guide - Ebook for Beginners", seller: "MarketingPro", price: 799, discountPrice: 399, image: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=300&fit=crop", category: "Ebooks", rating: 4.5 },
-  { title: "Birthday Card Collection - 50 Editable Designs", seller: "CardCraft", price: 599, image: "https://images.unsplash.com/photo-1513151233558-d860c5398176?w=400&h=300&fit=crop", category: "Templates", rating: 4.7 },
-  { title: "SaaS Landing Page - Tailwind CSS Template", seller: "WebDevPro", price: 2499, discountPrice: 1999, image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop", category: "Landing Pages", rating: 4.6 },
-  { title: "Minimalist Logo Pack - 100 Vector Logos", seller: "LogoMaster", price: 1999, image: "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=400&h=300&fit=crop", category: "Logo Design", rating: 4.8 },
-  { title: "Podcast Intro Music - 10 Royalty-Free Tracks", seller: "SoundWave", price: 899, discountPrice: 699, image: "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=400&h=300&fit=crop", category: "Podcasts", rating: 4.4 },
-  { title: "Wedding Invitation Kit - Floral Edition", seller: "EventDesigns", price: 1299, image: "https://images.unsplash.com/photo-1520854221256-17451cc331bf?w=400&h=300&fit=crop", category: "Templates", rating: 4.9 },
-];
+const CATEGORY_MAP: Record<string, string> = {
+  "All": "",
+  "Ebooks": "ebook",
+  "Templates": "template",
+  "Anime Art": "anime_art",
+  "Birthday Cards": "birthday_card",
+  "Anniversary Cards": "anniversary_card",
+  "Landing Pages": "landing_page",
+  "Logo Design": "logo_design",
+  "Podcasts": "podcast",
+  "Other": "other",
+};
+
+const DISPLAY_CATEGORY: Record<string, string> = {
+  ebook: "Ebooks",
+  template: "Templates",
+  anime_art: "Anime Art",
+  birthday_card: "Birthday Cards",
+  anniversary_card: "Anniversary Cards",
+  landing_page: "Landing Pages",
+  logo_design: "Logo Design",
+  podcast: "Podcasts",
+  other: "Other",
+};
 
 const Index = () => {
   const [activeCategory, setActiveCategory] = useState("All");
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = activeCategory === "All"
-    ? sampleProducts
-    : sampleProducts.filter((p) => p.category === activeCategory);
+  useEffect(() => {
+    loadProducts();
+  }, [activeCategory]);
+
+  const loadProducts = async () => {
+    setLoading(true);
+    let query = supabase
+      .from("products")
+      .select("*, stores(store_name)")
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const dbCategory = CATEGORY_MAP[activeCategory];
+    if (dbCategory) {
+      query = query.eq("category", dbCategory as any);
+    }
+
+    const { data } = await query;
+    setProducts(data || []);
+    setLoading(false);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,17 +79,31 @@ const Index = () => {
             <CategoryFilter active={activeCategory} onSelect={setActiveCategory} />
           </div>
 
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filtered.map((product, i) => (
-              <ProductCard key={i} {...product} />
-            ))}
+          <div className="mt-8">
+            {loading ? (
+              <div className="flex justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-accent" />
+              </div>
+            ) : products.length > 0 ? (
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    title={product.title}
+                    seller={(product as any).stores?.store_name || "Unknown"}
+                    price={product.price / 100}
+                    discountPrice={product.discount_price ? product.discount_price / 100 : undefined}
+                    image={product.preview_url || "/placeholder.svg"}
+                    category={DISPLAY_CATEGORY[product.category] || product.category}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="py-20 text-center text-muted-foreground">
+                No products found in this category yet.
+              </div>
+            )}
           </div>
-
-          {filtered.length === 0 && (
-            <div className="py-20 text-center text-muted-foreground">
-              No products found in this category yet.
-            </div>
-          )}
         </div>
       </section>
 

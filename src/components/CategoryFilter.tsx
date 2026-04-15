@@ -1,15 +1,17 @@
 import { motion } from "framer-motion";
-import { BookOpen, Palette, FileText, Music, Gift, Layout, Mic, Layers } from "lucide-react";
+import { BookOpen, Palette, FileText, Music, Gift, Layout, Mic, Layers, Heart, Globe } from "lucide-react";
 
 const categories = [
-  { name: "All", icon: Layers, active: true },
+  { name: "All", icon: Layers },
   { name: "Ebooks", icon: BookOpen },
   { name: "Templates", icon: FileText },
   { name: "Anime Art", icon: Palette },
+  { name: "Birthday Cards", icon: Gift },
+  { name: "Anniversary Cards", icon: Heart },
   { name: "Landing Pages", icon: Layout },
-  { name: "Logo Design", icon: Gift },
+  { name: "Logo Design", icon: Globe },
   { name: "Podcasts", icon: Mic },
-  { name: "Music", icon: Music },
+  { name: "Other", icon: Music },
 ];
 
 interface CategoryFilterProps {
