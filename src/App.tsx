@@ -8,6 +8,11 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index.tsx";
 import AuthPage from "./pages/AuthPage.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
+import SellerStore from "./pages/SellerStore.tsx";
+import SellerProducts from "./pages/SellerProducts.tsx";
+import StorePage from "./pages/StorePage.tsx";
+import AdminDashboard from "./pages/AdminDashboard.tsx";
+import BuyerOrders from "./pages/BuyerOrders.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -22,11 +27,44 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/store/:slug" element={<StorePage />} />
             <Route
               path="/dashboard"
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/seller/store"
+              element={
+                <ProtectedRoute>
+                  <SellerStore />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/seller/products"
+              element={
+                <ProtectedRoute>
+                  <SellerProducts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/*"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute>
+                  <BuyerOrders />
                 </ProtectedRoute>
               }
             />
