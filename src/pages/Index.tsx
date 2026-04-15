@@ -53,7 +53,7 @@ const Index = () => {
 
     const dbCategory = CATEGORY_MAP[activeCategory];
     if (dbCategory) {
-      query = query.eq("category", dbCategory);
+      query = query.eq("category", dbCategory as any);
     }
 
     const { data } = await query;
