@@ -85,12 +85,14 @@ const StorePage = () => {
             {products.map((p) => (
               <ProductCard
                 key={p.id}
+                id={p.id}
                 title={p.title}
                 price={p.price / 100}
                 discountPrice={p.discount_price ? p.discount_price / 100 : undefined}
                 image={p.preview_url || "/placeholder.svg"}
                 category={p.category.replace(/_/g, " ")}
                 seller={store.store_name}
+                storeId={store.id}
               />
             ))}
           </div>
