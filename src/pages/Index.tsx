@@ -89,12 +89,14 @@ const Index = () => {
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
+                    id={product.id}
                     title={product.title}
                     seller={(product as any).stores?.store_name || "Unknown"}
                     price={product.price / 100}
                     discountPrice={product.discount_price ? product.discount_price / 100 : undefined}
                     image={product.preview_url || "/placeholder.svg"}
                     category={DISPLAY_CATEGORY[product.category] || product.category}
+                    storeId={(product as any).stores?.id}
                   />
                 ))}
               </div>
