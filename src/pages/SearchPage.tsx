@@ -3,7 +3,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/neon/client";
 import { Loader2, SearchX } from "lucide-react";
 
 const DISPLAY_CATEGORY: Record<string, string> = {
@@ -87,3 +87,4 @@ const SearchPage = () => {
 };
 
 export default SearchPage;
+

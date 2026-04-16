@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { authClient } from "@/integrations/neon/client";
 import { useNavigate } from "react-router-dom";
+import type { User, Session } from "@neondatabase/auth";
 
 type Profile = {
   id: string;
@@ -30,60 +30,75 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-    setProfile(data as Profile | null);
-  };
-
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => fetchProfile(session.user.id), 0);
-        } else {
-          setProfile(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initAuth = async () => {
+      const { data: { session } } = await authClient.getSession();
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
       }
       setLoading(false);
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = authClient.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
+  const fetchProfile = async (userId: string) => {
+    const { data: { user: neonUser } } = await authClient.getUser(userId);
+    if (neonUser) {
+      setProfile({
+        id: neonUser.id,
+        user_id: neonUser.id,
+        full_name: neonUser.name,
+        avatar_url: neonUser.image,
+        role: "buyer",
+        membership_status: "free",
+      });
+    }
+  };
+
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
-    const { error } = await supabase.auth.signUp({
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { error } = await authClient.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName, role },
-        emailRedirectTo: window.location.origin,
+        data: { name: fullName, role },
+        emailRedirectTo: redirectTo,
       },
     });
     return { error };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { error } = await authClient.signInWithPassword({
+      email,
+      password,
+      options: {
+        redirectTo,
+      },
+    });
     return { error };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await authClient.signOut();
     setProfile(null);
   };
 

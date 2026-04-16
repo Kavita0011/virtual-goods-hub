@@ -7,12 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/neon/client";
 import { useToast } from "@/hooks/use-toast";
 import { Package, Plus, Trash2, Edit, Loader2, Upload, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Constants } from "@/integrations/supabase/types";
+import { Constants } from "@/integrations/neon/types";
 
 const CATEGORIES = Constants.public.Enums.product_category;
 
@@ -322,3 +322,4 @@ const SellerProducts = () => {
 };
 
 export default SellerProducts;
+

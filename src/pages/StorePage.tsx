@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/neon/client";
 import ProductCard from "@/components/ProductCard";
 import { Loader2, Store } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -104,3 +104,4 @@ const StorePage = () => {
 };
 
 export default StorePage;
+

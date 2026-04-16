@@ -5,7 +5,7 @@ import CategoryFilter from "@/components/CategoryFilter";
 import ProductCard from "@/components/ProductCard";
 import FeaturesSection from "@/components/FeaturesSection";
 import Footer from "@/components/Footer";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/neon/client";
 import { Loader2 } from "lucide-react";
 
 const CATEGORY_MAP: Record<string, string> = {
@@ -116,3 +116,4 @@ const Index = () => {
 };
 
 export default Index;
+
