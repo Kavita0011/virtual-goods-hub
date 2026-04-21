@@ -18,6 +18,7 @@ import SearchPage from "./pages/SearchPage.tsx";
 import AdminDashboard from "./pages/AdminDashboard.tsx";
 import BuyerOrders from "./pages/BuyerOrders.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import CheckoutPage from "./pages/CheckoutPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +74,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <BuyerOrders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/checkout"
+                element={
+                  <ProtectedRoute>
+                    <CheckoutPage />
                   </ProtectedRoute>
                 }
               />
