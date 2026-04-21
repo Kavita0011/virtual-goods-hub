@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -6,28 +6,52 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/neon/client";
-import { Camera, CheckCircle, Loader2, CreditCard, AlertCircle, ArrowLeft } from "lucide-react";
+import { CreditCard, AlertCircle, ArrowLeft, CheckCircle, Loader2, Gift, Copy } from "lucide-react";
 
 const UPI_ID = "virtualhub@xyzbank";
 
 const UPIPayment = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   
   const orderId = searchParams.get("order_id");
   const amount = Number(searchParams.get("amount")) || 0;
   const productTitle = searchParams.get("product") || "VirtualHub Purchase";
 
   const [utr, setUtr] = useState("");
-  const [screenshot, setScreenshot] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [verification, setVerification] = useState<any>(null);
+
+  useEffect(() => {
+    if (orderId && user) {
+      checkVerificationStatus();
+    }
+  }, [orderId, user]);
+
+  const checkVerificationStatus = async () => {
+    if (!orderId) return;
+    
+    const { data } = await supabase
+      .from("payment_verifications")
+      .select("*, orders(*), gift_codes(*)")
+      .eq("order_id", orderId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      setVerification(data);
+      if (data.status === "verified") {
+        setSubmitted(true);
+      }
+    }
+  };
 
   const handleUPIIntent = () => {
     if (amount <= 0) return;
-
     const upiLink = `upi://pay?pa=${UPI_ID}&pn=VirtualHub&cu=INR&am=${amount.toFixed(2)}&tn=Order-${orderId || "DIRECT"}`;
     window.open(upiLink, "_blank");
   };
@@ -59,8 +83,7 @@ const UPIPayment = () => {
           buyer_id: user.id,
           amount: amount * 100,
           upi_id: UPI_ID,
-          utr: utr.trim(),
-          screenshot_url: screenshot,
+          utr: utr.trim().toUpperCase(),
           status: "pending",
           payment_method: "UPI",
           transaction_note: `Purchase: ${productTitle}`,
@@ -79,7 +102,11 @@ const UPIPayment = () => {
     setLoading(false);
   };
 
-  if (submitted) {
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+  };
+
+  if (verification?.status === "verified") {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -88,19 +115,52 @@ const UPIPayment = () => {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
-            <h2 className="font-heading text-2xl font-bold">Payment Submitted!</h2>
-            <p className="mt-2 text-muted-foreground">
-              Your payment is being verified. You'll receive your product once confirmed by admin.
-            </p>
-            <div className="mt-6 rounded-lg bg-secondary/50 p-4">
-              <p className="text-sm text-muted-foreground">
-                <strong>UTR:</strong> {utr}
-                <br />
-                <strong>Amount:</strong> ₹{amount.toFixed(2)}
-              </p>
+            <h2 className="font-heading text-2xl font-bold">Payment Verified!</h2>
+            <p className="mt-2 text-muted-foreground">Your payment has been confirmed. Here is your gift code:</p>
+            
+            {verification.gift_codes?.[0] && (
+              <div className="mt-6 rounded-xl border-2 border-accent bg-accent/10 p-6">
+                <Gift className="mx-auto h-8 w-8 text-accent mb-2" />
+                <p className="text-sm text-muted-foreground">Your Gift Code</p>
+                <div className="mt-2 flex items-center justify-center gap-2">
+                  <p className="text-2xl font-bold font-mono text-accent">{verification.gift_codes[0].code}</p>
+                  <Button variant="ghost" size="icon" onClick={() => copyCode(verification.gift_codes[0].code)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <Button onClick={() => navigate("/library")} className="mt-6 w-full">
+              Go to My Library
+            </Button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (submitted || verification?.status === "pending") {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="container mx-auto px-4 py-10">
+          <div className="mx-auto max-w-md text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-yellow-100">
+              <Loader2 className="h-8 w-8 text-yellow-600 animate-spin" />
             </div>
-            <Button onClick={() => navigate("/dashboard")} className="mt-6 w-full">
-              Go to Dashboard
+            <h2 className="font-heading text-2xl font-bold">Payment Under Review</h2>
+            <p className="mt-2 text-muted-foreground">
+              Your payment is being verified by our team. This usually takes 10-30 minutes.
+            </p>
+            <div className="mt-6 rounded-lg bg-secondary/50 p-4 text-left">
+              <p className="text-sm"><strong>UTR:</strong> {utr || verification?.utr}</p>
+              <p className="text-sm"><strong>Amount:</strong> ₹{amount.toFixed(2)}</p>
+              <p className="text-sm"><strong>Status:</strong> <span className="text-yellow-600">Pending Verification</span></p>
+            </div>
+            <Button onClick={() => navigate("/dashboard")} className="mt-6 w-full" variant="outline">
+              Back to Dashboard
             </Button>
           </div>
         </div>
@@ -135,6 +195,12 @@ const UPIPayment = () => {
               <p className="text-xs text-muted-foreground mt-1">{productTitle}</p>
             </div>
 
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mb-4">
+              <p className="text-sm text-blue-700">
+                <strong>UPI ID:</strong> {UPI_ID}
+              </p>
+            </div>
+
             <Button onClick={handleUPIIntent} className="w-full mb-6" size="lg">
               Open UPI App
             </Button>
@@ -142,16 +208,16 @@ const UPIPayment = () => {
             <div className="border-t border-border pt-6">
               <h3 className="font-medium mb-4">Verify Payment</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                After payment, enter the UTR number from your payment confirmation.
+                After payment, enter the UTR/Ref number from your payment confirmation screen.
               </p>
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">UTR Number</label>
+                  <label className="text-sm font-medium">UTR / Reference Number</label>
                   <Input
                     value={utr}
-                    onChange={(e) => setUtr(e.target.value)}
-                    placeholder="Enter 12-digit UTR"
+                    onChange={(e) => setUtr(e.target.value.toUpperCase())}
+                    placeholder="Enter UTR (e.g., 123456789012)"
                     maxLength={20}
                   />
                 </div>
@@ -163,23 +229,19 @@ const UPIPayment = () => {
                   </div>
                 )}
 
-                <Button onClick={handleVerify} disabled={loading} className="w-full">
+                <Button onClick={handleVerify} disabled={loading || !utr.trim()} className="w-full">
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying...
+                      Submitting...
                     </>
                   ) : (
-                    "Verify Payment"
+                    "Submit for Verification"
                   )}
                 </Button>
               </div>
             </div>
           </div>
-
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Pay to UPI: {UPI_ID}
-          </p>
         </div>
       </div>
       <Footer />
