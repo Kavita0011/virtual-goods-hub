@@ -19,6 +19,7 @@ import AdminDashboard from "./pages/AdminDashboard.tsx";
 import BuyerOrders from "./pages/BuyerOrders.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import CheckoutPage from "./pages/CheckoutPage.tsx";
+import BecomeSeller from "./pages/BecomeSeller.tsx";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <SellerProducts />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/seller/become"
+                element={
+                  <ProtectedRoute>
+                    <BecomeSeller />
                   </ProtectedRoute>
                 }
               />

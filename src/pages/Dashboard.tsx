@@ -3,7 +3,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Package, Store, ShoppingBag, Crown, LogOut } from "lucide-react";
+import { Package, Store, ShoppingBag, Crown, LogOut, ArrowUpCircle } from "lucide-react";
 
 const Dashboard = () => {
   const { profile, signOut, loading } = useAuth();
@@ -21,6 +21,9 @@ const Dashboard = () => {
     await signOut();
     navigate("/");
   };
+
+  const isSeller = profile?.role === "seller" || profile?.role === "admin";
+  const isBuyer = profile?.role === "buyer" || profile?.role === "admin";
 
   return (
     <div className="min-h-screen bg-background">
@@ -43,57 +46,88 @@ const Dashboard = () => {
           </Button>
         </div>
 
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {profile?.role === "seller" && (
-            <>
+        {/* Seller Section */}
+        <div className="mt-8">
+          <h2 className="font-heading text-xl font-semibold mb-4 flex items-center gap-2">
+            <Store className="h-5 w-5" />
+            Seller Dashboard
+          </h2>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {isSeller ? (
+              <>
+                <DashCard
+                  icon={<Store className="h-6 w-6" />}
+                  title="My Store"
+                  desc="Manage your store and settings"
+                  onClick={() => navigate("/seller/store")}
+                />
+                <DashCard
+                  icon={<Package className="h-6 w-6" />}
+                  title="My Products"
+                  desc="List and manage your products"
+                  onClick={() => navigate("/seller/products")}
+                />
+                <DashCard
+                  icon={<Crown className="h-6 w-6" />}
+                  title="Upgrade to Pro"
+                  desc="Unlimited products, lower fees"
+                  onClick={() => navigate("/seller/upgrade")}
+                  accent
+                />
+              </>
+            ) : (
               <DashCard
-                icon={<Store className="h-6 w-6" />}
-                title="My Store"
-                desc="Manage your store and settings"
-                onClick={() => navigate("/seller/store")}
-              />
-              <DashCard
-                icon={<Package className="h-6 w-6" />}
-                title="My Products"
-                desc="List and manage your products"
-                onClick={() => navigate("/seller/products")}
-              />
-              <DashCard
-                icon={<Crown className="h-6 w-6" />}
-                title="Upgrade to Pro"
-                desc="Unlimited products, lower fees"
-                onClick={() => navigate("/seller/upgrade")}
+                icon={<ArrowUpCircle className="h-6 w-6" />}
+                title="Become a Seller"
+                desc="Start selling your digital products"
+                onClick={() => navigate("/seller/become")}
                 accent
               />
-            </>
-          )}
+            )}
+          </div>
+        </div>
 
-          {profile?.role === "buyer" && (
-            <>
-              <DashCard
-                icon={<ShoppingBag className="h-6 w-6" />}
-                title="My Orders"
-                desc="View your purchase history"
-                onClick={() => navigate("/orders")}
-              />
-              <DashCard
-                icon={<Package className="h-6 w-6" />}
-                title="My Library"
-                desc="Re-download purchased files"
-                onClick={() => navigate("/library")}
-              />
-              <DashCard
-                icon={<Crown className="h-6 w-6" />}
-                title="Become a Member"
-                desc="Get 10% off all products"
-                onClick={() => navigate("/membership")}
-                accent
-              />
-            </>
-          )}
+        {/* Buyer Section */}
+        <div className="mt-8">
+          <h2 className="font-heading text-xl font-semibold mb-4 flex items-center gap-2">
+            <ShoppingBag className="h-5 w-5" />
+            Buyer Dashboard
+          </h2>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {isBuyer && (
+              <>
+                <DashCard
+                  icon={<ShoppingBag className="h-6 w-6" />}
+                  title="My Orders"
+                  desc="View your purchase history"
+                  onClick={() => navigate("/orders")}
+                />
+                <DashCard
+                  icon={<Package className="h-6 w-6" />}
+                  title="My Library"
+                  desc="Re-download purchased files"
+                  onClick={() => navigate("/library")}
+                />
+                <DashCard
+                  icon={<Crown className="h-6 w-6" />}
+                  title="Become a Member"
+                  desc="Get 10% off all products"
+                  onClick={() => navigate("/membership")}
+                  accent
+                />
+              </>
+            )}
+          </div>
+        </div>
 
-          {profile?.role === "admin" && (
-            <>
+        {/* Admin Section */}
+        {profile?.role === "admin" && (
+          <div className="mt-8">
+            <h2 className="font-heading text-xl font-semibold mb-4 flex items-center gap-2">
+              <Crown className="h-5 w-5" />
+              Admin Dashboard
+            </h2>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               <DashCard
                 icon={<Store className="h-6 w-6" />}
                 title="Manage Stores"
@@ -103,7 +137,7 @@ const Dashboard = () => {
               <DashCard
                 icon={<Package className="h-6 w-6" />}
                 title="Manage Products"
-                desc="Review and moderate products"
+                desc="View all products on platform"
                 onClick={() => navigate("/admin/products")}
               />
               <DashCard
@@ -112,45 +146,28 @@ const Dashboard = () => {
                 desc="View platform-wide orders"
                 onClick={() => navigate("/admin/orders")}
               />
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
       <Footer />
     </div>
   );
 };
 
-const DashCard = ({
-  icon,
-  title,
-  desc,
-  onClick,
-  accent,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  onClick: () => void;
-  accent?: boolean;
-}) => (
+const DashCard = ({ icon, title, desc, onClick, accent }: { icon: any; title: string; desc: string; onClick: () => void; accent?: boolean }) => (
   <button
     onClick={onClick}
-    className={`flex flex-col items-start gap-3 rounded-xl border p-6 text-left transition-all hover:shadow-[var(--card-shadow-hover)] ${
-      accent
-        ? "border-accent/30 bg-accent/5 hover:border-accent/50"
-        : "border-border bg-card"
+    className={`flex flex-col items-start gap-3 rounded-xl border p-6 text-left transition-all hover:shadow-lg ${
+      accent ? "border-accent/30 bg-accent/5 hover:border-accent/50" : "border-border bg-card"
     }`}
   >
-    <div className={`rounded-lg p-2 ${accent ? "bg-accent/10 text-accent" : "bg-muted text-muted-foreground"}`}>
-      {icon}
-    </div>
+    <div className={`p-2 rounded-lg ${accent ? "bg-accent/10" : "bg-secondary"}`}>{icon}</div>
     <div>
       <h3 className="font-heading font-semibold text-foreground">{title}</h3>
-      <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
+      <p className="text-sm text-muted-foreground mt-1">{desc}</p>
     </div>
   </button>
 );
 
 export default Dashboard;
-

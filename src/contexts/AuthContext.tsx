@@ -7,6 +7,7 @@ type User = {
   email: string;
   name?: string;
   image?: string;
+  role?: "admin" | "seller" | "buyer";
 };
 
 type Session = {
@@ -31,6 +32,7 @@ type AuthContextType = {
   signUp: (email: string, password: string, fullName: string, role: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  updateRole: (newRole: "admin" | "seller" | "buyer") => Promise<{ error: Error | null }>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -157,8 +159,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.removeItem("session");
   };
 
+  const updateRole = async (newRole: "admin" | "seller" | "buyer") => {
+    if (!user) return { error: new Error("Not authenticated") };
+    try {
+      const { error: userError } = await supabase
+        .from("users")
+        .update({ role: newRole })
+        .eq("id", user.id);
+
+      if (userError) return { error: userError.error as Error };
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ role: newRole })
+        .eq("user_id", user.id);
+
+      if (profileError) return { error: profileError.error as Error };
+
+      setProfile((prev) => prev ? { ...prev, role: newRole } : null);
+
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signUp, signIn, signOut, updateRole }}>
       {children}
     </AuthContext.Provider>
   );
