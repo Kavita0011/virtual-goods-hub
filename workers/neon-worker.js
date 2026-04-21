@@ -56,46 +56,95 @@ async function handleDatabaseRequest(request, env) {
 
     switch (request.method) {
       case "GET": {
-        let query = `SELECT ${select} FROM ${table}`;
-        const filters = [];
-        const values = [];
+        const joinMatch = select.match(/(\w+)\((\w+)\)/);
+        
+        if (joinMatch) {
+          const mainTable = table;
+          const joinTable = joinMatch[1];
+          const joinAlias = joinMatch[2];
+          const mainSelect = select.replace(/,?\s*\w+\(\w+\)/, "").trim() || "*";
+          
+          let query = `SELECT ${mainTable}.*, json_build_object('${joinAlias}_id', ${joinTable}.id, '${joinAlias}_name', ${joinTable}.store_name) as ${joinAlias} FROM ${mainTable}`;
+          query += ` LEFT JOIN stores ON ${mainTable}.store_id = stores.id`;
+          
+          const filters = [];
+          const values = [];
 
-        for (const [key, value] of searchParams.entries()) {
-          if (key.startsWith("filter_")) {
-            const field = key.replace("filter_", "");
-            values.push(value);
-            filters.push(`${field} = $${values.length}`);
+          for (const [key, value] of searchParams.entries()) {
+            if (key.startsWith("filter_")) {
+              const field = key.replace("filter_", "");
+              values.push(value);
+              filters.push(`${mainTable}.${field} = $${values.length}`);
+            }
           }
-        }
 
-        if (filters.length > 0) {
-          query += ` WHERE ${filters.join(" AND ")}`;
-        }
+          if (filters.length > 0) {
+            query += ` WHERE ${filters.join(" AND ")}`;
+          }
 
-        const order = searchParams.get("order");
-        if (order) {
-          query += ` ORDER BY ${order.replace(".", " ")}`;
-        }
+          const order = searchParams.get("order");
+          if (order) {
+            const [field, direction] = order.split(".");
+            query += ` ORDER BY ${mainTable}.${field} ${direction || "asc"}`;
+          }
 
-        const limit = searchParams.get("limit");
-        if (limit) {
-          query += ` LIMIT ${parseInt(limit)}`;
-        }
+          const limit = searchParams.get("limit");
+          if (limit) {
+            query += ` LIMIT ${parseInt(limit)}`;
+          }
 
-        const offset = searchParams.get("offset");
-        if (offset) {
-          query += ` OFFSET ${parseInt(offset)}`;
+          const offset = searchParams.get("offset");
+          if (offset) {
+            query += ` OFFSET ${parseInt(offset)}`;
+          }
+
+          if (single) {
+            query += " LIMIT 1";
+          }
+
+          result = await sql(query, values);
+        } else {
+          let query = `SELECT ${select} FROM ${table}`;
+          const filters = [];
+          const values = [];
+
+          for (const [key, value] of searchParams.entries()) {
+            if (key.startsWith("filter_")) {
+              const field = key.replace("filter_", "");
+              values.push(value);
+              filters.push(`${field} = $${values.length}`);
+            }
+          }
+
+          if (filters.length > 0) {
+            query += ` WHERE ${filters.join(" AND ")}`;
+          }
+
+          const order = searchParams.get("order");
+          if (order) {
+            const [field, direction] = order.split(".");
+            query += ` ORDER BY ${field} ${direction || "asc"}`;
+          }
+
+          const limit = searchParams.get("limit");
+          if (limit) {
+            query += ` LIMIT ${parseInt(limit)}`;
+          }
+
+          const offset = searchParams.get("offset");
+          if (offset) {
+            query += ` OFFSET ${parseInt(offset)}`;
+          }
+
+          if (single) {
+            query += " LIMIT 1";
+          }
+
+          result = await sql(query, values);
         }
 
         if (single) {
-          query += " LIMIT 1";
-        }
-
-        result = await sql(query, values);
-        if (single && result.length > 0) {
-          result = result[0];
-        } else if (single) {
-          result = null;
+          result = result && result.length > 0 ? result[0] : null;
         }
         break;
       }
