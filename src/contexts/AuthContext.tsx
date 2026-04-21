@@ -1,7 +1,18 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { authClient } from "@/integrations/neon/client";
 import { useNavigate } from "react-router-dom";
-import type { User, Session } from "@neondatabase/auth";
+import { supabase } from "@/integrations/neon/client";
+
+type User = {
+  id: string;
+  email: string;
+  name?: string;
+  image?: string;
+};
+
+type Session = {
+  user: User;
+  expiresAt: Date;
+};
 
 type Profile = {
   id: string;
@@ -17,8 +28,8 @@ type AuthContextType = {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, role: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, fullName: string, role: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -29,77 +40,121 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const initAuth = async () => {
-      const { data: { session } } = await authClient.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
+      const storedUser = localStorage.getItem("user");
+      const storedSession = localStorage.getItem("session");
+      
+      if (storedUser && storedSession) {
+        const parsedUser = JSON.parse(storedUser);
+        const parsedSession = JSON.parse(storedSession);
+        setUser(parsedUser);
+        setSession(parsedSession);
+        fetchProfile(parsedUser.id);
       }
       setLoading(false);
     };
 
     initAuth();
-
-    const { data: { subscription } } = authClient.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data: { user: neonUser } } = await authClient.getUser(userId);
-    if (neonUser) {
-      setProfile({
-        id: neonUser.id,
-        user_id: neonUser.id,
-        full_name: neonUser.name,
-        avatar_url: neonUser.image,
-        role: "buyer",
-        membership_status: "free",
-      });
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!error && data) {
+      setProfile(data as Profile);
     }
   };
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
-    const redirectTo = `${window.location.origin}/auth/callback`;
-    const { error } = await authClient.signUp({
-      email,
-      password,
-      options: {
-        data: { name: fullName, role },
-        emailRedirectTo: redirectTo,
-      },
-    });
-    return { error };
+    try {
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (existingUser) {
+        return { error: new Error("Email already registered") };
+      }
+
+      const { data: newUser, error: createError } = await supabase
+        .from("users")
+        .insert({
+          email,
+          password_hash: password,
+          full_name: fullName,
+          role: role as "admin" | "seller" | "buyer",
+        })
+        .maybeSingle();
+
+      if (createError) {
+        return { error: createError.error as Error };
+      }
+
+      if (newUser) {
+        await supabase.from("profiles").insert({
+          user_id: newUser.id,
+          full_name: fullName,
+          role: role as "admin" | "seller" | "buyer",
+        });
+      }
+
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const redirectTo = `${window.location.origin}/auth/callback`;
-    const { error } = await authClient.signInWithPassword({
-      email,
-      password,
-      options: {
-        redirectTo,
-      },
-    });
-    return { error };
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email)
+        .eq("password_hash", password)
+        .maybeSingle();
+
+      if (error || !data) {
+        return { error: new Error("Invalid email or password") };
+      }
+
+      const user: User = {
+        id: data.id,
+        email: data.email,
+        name: data.full_name,
+        image: data.avatar_url,
+      };
+
+      const session: Session = {
+        user,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      };
+
+      setUser(user);
+      setSession(session);
+      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("session", JSON.stringify(session));
+      fetchProfile(user.id);
+
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
   };
 
   const signOut = async () => {
-    await authClient.signOut();
+    setUser(null);
+    setSession(null);
     setProfile(null);
+    localStorage.removeItem("user");
+    localStorage.removeItem("session");
   };
 
   return (

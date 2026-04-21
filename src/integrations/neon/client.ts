@@ -1,11 +1,3 @@
-import { createAuthClient } from "@neondatabase/auth";
-
-const NEON_AUTH_URL = import.meta.env.VITE_NEON_AUTH_URL;
-
-export const authClient = createAuthClient({
-  baseURL: NEON_AUTH_URL,
-});
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 interface QueryParams {
@@ -59,12 +51,12 @@ class TableQuery {
   private baseUrl: string;
   private table: string;
   private filters: QueryParams = {};
-  private selectFields: string = "*";
+  private selectFields = "*";
   private orderField?: string;
   private orderDirection?: "asc" | "desc";
   private limitValue?: number;
   private offsetValue?: number;
-  private isSingle: boolean = false;
+  private isSingle = false;
 
   constructor(baseUrl: string, table: string) {
     this.baseUrl = baseUrl;
@@ -76,8 +68,8 @@ class TableQuery {
     return this;
   }
 
-  eq(key: string, value: any) {
-    this.filters[key] = value;
+  eq(key: string, value: unknown) {
+    this.filters[key] = value as string | number | boolean | undefined;
     return this;
   }
 
@@ -102,24 +94,28 @@ class TableQuery {
     return this;
   }
 
-  async maybeSingle(): Promise<ApiResponse<any>> {
+  maybeSingle() {
     this.isSingle = true;
+    return this;
+  }
+
+  async execute(): Promise<ApiResponse<unknown>> {
     return this.executeGet();
   }
 
-  async insert(data: Record<string, any>): Promise<ApiResponse<any>> {
+  async insert(data: Record<string, unknown>): Promise<ApiResponse<unknown>> {
     return this.executeMutation("POST", data);
   }
 
-  async update(data: Record<string, any>): Promise<ApiResponse<any>> {
+  async update(data: Record<string, unknown>): Promise<ApiResponse<unknown>> {
     return this.executeMutation("PATCH", data);
   }
 
-  async delete(): Promise<ApiResponse<any>> {
+  async delete(): Promise<ApiResponse<unknown>> {
     return this.executeMutation("DELETE", {});
   }
 
-  private async executeGet(): Promise<ApiResponse<any>> {
+  private async executeGet(): Promise<ApiResponse<unknown>> {
     try {
       const params = new URLSearchParams();
       params.set("table", this.table);
@@ -163,15 +159,16 @@ class TableQuery {
 
       const data = await response.json();
       return { data, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message || "Unknown error" } };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return { data: null, error: { message } };
     }
   }
 
   private async executeMutation(
     method: "POST" | "PATCH" | "DELETE",
-    body: Record<string, any>
-  ): Promise<ApiResponse<any>> {
+    body: Record<string, unknown>
+  ): Promise<ApiResponse<unknown>> {
     try {
       const params = new URLSearchParams();
       params.set("table", this.table);
@@ -201,8 +198,9 @@ class TableQuery {
 
       const data = await response.json();
       return { data, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message || "Unknown error" } };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return { data: null, error: { message } };
     }
   }
 
