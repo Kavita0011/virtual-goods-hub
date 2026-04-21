@@ -20,6 +20,9 @@ import BuyerOrders from "./pages/BuyerOrders.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import CheckoutPage from "./pages/CheckoutPage.tsx";
 import BecomeSeller from "./pages/BecomeSeller.tsx";
+import SellerGuide from "./pages/SellerGuide.tsx";
+import TermsPage from "./pages/TermsPage.tsx";
+import UPIPayment from "./pages/UPIPayment.tsx";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +73,16 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/seller/guide"
+                element={
+                  <ProtectedRoute>
+                    <SellerGuide />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/upi-pay" element={<UPIPayment />} />
               <Route
                 path="/admin/*"
                 element={

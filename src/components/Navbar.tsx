@@ -56,6 +56,21 @@ const Navbar = () => {
           <Link to="/" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             Marketplace
           </Link>
+          <Link to="/sell" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            Sell
+          </Link>
+          <Link to="/#about" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            About
+          </Link>
+          <Link to="#support" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            Support
+          </Link>
+          <Link to="/terms" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            Terms
+          </Link>
+          <Link to="/#contact" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            Contact
+          </Link>
           {user && (profile?.role === "seller" || profile?.role === "admin") && (
             <Link to="/dashboard" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
               Dashboard
