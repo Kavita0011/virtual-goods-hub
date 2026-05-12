@@ -1,34 +1,11 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/neon/client";
 
-type User = {
-  id: string;
-  email: string;
-  name?: string;
-  image?: string;
-  role?: "admin" | "seller" | "buyer";
-};
-
-type Session = {
-  user: User;
-  expiresAt: Date;
-};
-
-type Profile = {
-  id: string;
-  user_id: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  role: "admin" | "seller" | "buyer";
-  membership_status: "free" | "member";
-};
-
+type User = { id: string; email: string; name?: string; image?: string; role?: "admin" | "seller" | "buyer" };
+type Session = { user: User; expiresAt: Date };
+type Profile = { id: string; user_id: string; full_name: string | null; avatar_url: string | null; role: "admin" | "seller" | "buyer"; membership_status: "free" | "member" };
 type AuthContextType = {
-  user: User | null;
-  session: Session | null;
-  profile: Profile | null;
-  loading: boolean;
+  user: User | null; session: Session | null; profile: Profile | null; loading: boolean;
   signUp: (email: string, password: string, fullName: string, role: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -42,108 +19,66 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
-    const initAuth = async () => {
-      const storedUser = localStorage.getItem("user");
-      const storedSession = localStorage.getItem("session");
-      
-      if (storedUser && storedSession) {
-        const parsedUser = JSON.parse(storedUser);
-        const parsedSession = JSON.parse(storedSession);
-        setUser(parsedUser);
-        setSession(parsedSession);
-        fetchProfile(parsedUser.id);
-      }
-      setLoading(false);
-    };
+    const storedUser = localStorage.getItem("user");
+    const storedSession = localStorage.getItem("session");
+    const storedProfile = localStorage.getItem("profile");
 
-    initAuth();
-  }, []);
-
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (!error && data) {
-      setProfile(data as Profile);
+    if (storedUser && storedSession) {
+      setUser(JSON.parse(storedUser));
+      setSession(JSON.parse(storedSession));
+      if (storedProfile) setProfile(JSON.parse(storedProfile));
     }
-  };
+    setLoading(false);
+  }, []);
 
   const signUp = async (email: string, password: string, fullName: string, role: string) => {
     try {
-      const { data: existingUser } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle();
+      const result = await supabase.auth.signup(email, password, fullName, role);
+      if (result.error) return { error: new Error(result.error) };
 
-      if (existingUser) {
-        return { error: new Error("Email already registered") };
-      }
+      const u: User = { id: result.user.id, email: result.user.email, name: result.user.full_name, role: result.user.role };
+      const s: Session = { user: u, expiresAt: new Date(Date.now() + 7 * 86400000) };
 
-      const { data: newUser, error: createError } = await supabase
-        .from("users")
-        .insert({
-          email,
-          password_hash: password,
-          full_name: fullName,
-          role: role as "admin" | "seller" | "buyer",
-        })
-        .maybeSingle();
+      setUser(u);
+      setSession(s);
+      localStorage.setItem("user", JSON.stringify(u));
+      localStorage.setItem("session", JSON.stringify(s));
 
-      if (createError) {
-        return { error: createError.error as Error };
-      }
-
-      if (newUser) {
-        await supabase.from("profiles").insert({
-          user_id: newUser.id,
-          full_name: fullName,
-          role: role as "admin" | "seller" | "buyer",
-        });
-      }
-
+      // Fetch profile
+      fetchProfile(u.id);
       return { error: null };
     } catch (err) {
       return { error: err as Error };
     }
   };
 
+  const fetchProfile = async (userId: string) => {
+    const result = await supabase.from("profiles").select("*").eq("user_id", userId).execute();
+    if (result.data && result.data.length > 0) {
+      setProfile(result.data[0] as Profile);
+      localStorage.setItem("profile", JSON.stringify(result.data[0]));
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .eq("password_hash", password)
-        .maybeSingle();
+      const result = await supabase.auth.login(email, password);
+      if (result.error) return { error: new Error(result.error) };
 
-      if (error || !data) {
-        return { error: new Error("Invalid email or password") };
+      const u: User = { id: result.user.id, email: result.user.email, name: result.user.full_name, role: result.user.role };
+      const s: Session = { user: u, expiresAt: new Date(result.expiresAt || Date.now() + 7 * 86400000) };
+
+      setUser(u);
+      setSession(s);
+      localStorage.setItem("user", JSON.stringify(u));
+      localStorage.setItem("session", JSON.stringify(s));
+
+      if (result.profile) {
+        setProfile(result.profile as Profile);
+        localStorage.setItem("profile", JSON.stringify(result.profile));
       }
-
-      const user: User = {
-        id: data.id,
-        email: data.email,
-        name: data.full_name,
-        image: data.avatar_url,
-      };
-
-      const session: Session = {
-        user,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      };
-
-      setUser(user);
-      setSession(session);
-      localStorage.setItem("user", JSON.stringify(user));
-      localStorage.setItem("session", JSON.stringify(session));
-      fetchProfile(user.id);
 
       return { error: null };
     } catch (err) {
@@ -157,26 +92,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setProfile(null);
     localStorage.removeItem("user");
     localStorage.removeItem("session");
+    localStorage.removeItem("profile");
   };
 
   const updateRole = async (newRole: "admin" | "seller" | "buyer") => {
     if (!user) return { error: new Error("Not authenticated") };
     try {
-      const { error: userError } = await supabase
-        .from("users")
-        .update({ role: newRole })
-        .eq("id", user.id);
+      const result = await supabase.auth.updateRole(user.id, newRole);
+      if (result.error) return { error: new Error(result.error) };
 
-      if (userError) return { error: userError.error as Error };
-
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ role: newRole })
-        .eq("user_id", user.id);
-
-      if (profileError) return { error: profileError.error as Error };
-
-      setProfile((prev) => prev ? { ...prev, role: newRole } : null);
+      setProfile((prev) => (prev ? { ...prev, role: newRole } : null));
+      const updatedUser = { ...user, role: newRole };
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      if (profile) localStorage.setItem("profile", JSON.stringify({ ...profile, role: newRole }));
 
       return { error: null };
     } catch (err) {
@@ -192,7 +121,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 };

@@ -1,212 +1,63 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://virtual-hub-api.devappkavita.workers.dev";
 
-interface QueryParams {
-  [key: string]: string | number | boolean | undefined;
+async function api(method: string, path: string, body?: any) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const result = await res.json();
+  if (result?.error) return { data: null, error: { message: result.error } };
+  return { data: result, error: null };
 }
 
-interface ApiResponse<T> {
-  data: T | null;
-  error: { message: string } | null;
+function buildQuery(table: string, params: Record<string, string>) {
+  const qs = new URLSearchParams({ table, ...params }).toString();
+  return `${API_BASE_URL}/db?${qs}`;
 }
 
-class NeonDatabaseClient {
-  private baseUrl: string;
+export const supabase = {
+  from: (table: string) => {
+    const ctx: Record<string, any> = { filters: {}, select: "*", single: false };
 
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
-  }
+    const end = async () => {
+      const p: Record<string, string> = { table, select: ctx.select };
+      if (ctx.single) p.single = "true";
+      if (ctx.order) p.order = ctx.order;
+      if (ctx.limit !== undefined) p.limit = String(ctx.limit);
+      Object.entries(ctx.filters).forEach(([k, v]) => (p[`filter_${k}`] = v));
+      return api("GET", `/db?${new URLSearchParams(p).toString()}`);
+    };
 
-  from(table: string) {
-    return new TableQuery(this.baseUrl, table);
-  }
-
-  storage = {
-    from: (bucket: string) => ({
-      upload: async (path: string, file: File | Blob, options?: { upsert?: boolean }) => {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("path", path);
-        formData.append("upsert", String(options?.upsert ?? false));
-
-        const response = await fetch(`${this.baseUrl}/storage/${bucket}/upload`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          return { data: null, error: { message: "Upload failed" } };
-        }
-
-        const data = await response.json();
-        return { data, error: null };
-      },
-      getPublicUrl: (path: string) => {
-        return { data: { publicUrl: `${this.baseUrl}/storage/${bucket}/${path}` }, error: null };
-      },
-    }),
-  };
-}
-
-class TableQuery {
-  private baseUrl: string;
-  private table: string;
-  private filters: QueryParams = {};
-  private selectFields = "*";
-  private orderField?: string;
-  private orderDirection?: "asc" | "desc";
-  private limitValue?: number;
-  private offsetValue?: number;
-  private isSingle = false;
-
-  constructor(baseUrl: string, table: string) {
-    this.baseUrl = baseUrl;
-    this.table = table;
-  }
-
-  select(fields: string) {
-    this.selectFields = fields;
-    return this;
-  }
-
-  eq(key: string, value: unknown) {
-    this.filters[key] = value as string | number | boolean | undefined;
-    return this;
-  }
-
-  order(field: string, options?: { ascending?: boolean }) {
-    this.orderField = field;
-    this.orderDirection = options?.ascending ? "asc" : "desc";
-    return this;
-  }
-
-  limit(count: number) {
-    this.limitValue = count;
-    return this;
-  }
-
-  offset(count: number) {
-    this.offsetValue = count;
-    return this;
-  }
-
-  single() {
-    this.isSingle = true;
-    return this;
-  }
-
-  maybeSingle() {
-    this.isSingle = true;
-    return this;
-  }
-
-  async execute(): Promise<ApiResponse<unknown>> {
-    return this.executeGet();
-  }
-
-  async insert(data: Record<string, unknown>): Promise<ApiResponse<unknown>> {
-    return this.executeMutation("POST", data);
-  }
-
-  async update(data: Record<string, unknown>): Promise<ApiResponse<unknown>> {
-    return this.executeMutation("PATCH", data);
-  }
-
-  async delete(): Promise<ApiResponse<unknown>> {
-    return this.executeMutation("DELETE", {});
-  }
-
-  private async executeGet(): Promise<ApiResponse<unknown>> {
-    try {
-      const params = new URLSearchParams();
-      params.set("table", this.table);
-      params.set("select", this.selectFields);
-
-      if (this.isSingle) {
-        params.set("single", "true");
-      }
-
-      Object.entries(this.filters).forEach(([key, value]) => {
-        if (value !== undefined) {
-          params.set(`filter_${key}`, String(value));
-        }
-      });
-
-      if (this.orderField) {
-        params.set("order", `${this.orderField}.${this.orderDirection || "asc"}`);
-      }
-      if (this.limitValue !== undefined) {
-        params.set("limit", String(this.limitValue));
-      }
-      if (this.offsetValue !== undefined) {
-        params.set("offset", String(this.offsetValue));
-      }
-
-      const url = `${this.baseUrl}/db?${params.toString()}`;
-      const authToken = this.getAuthHeader();
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    return {
+      select: (fields: string) => ({
+        eq: (key: string, value: unknown) => {
+          ctx.filters[key] = String(value);
+          return {
+            order: (field: string, opts?: { ascending?: boolean }) => {
+              ctx.order = `${field}.${opts?.ascending ? "asc" : "desc"}`;
+              return {
+                limit: (count: number) => { ctx.limit = count; const e = { execute: end, then: (resolve: any) => end().then(resolve) }; return e; },
+                execute: end,
+              };
+            },
+            execute: end,
+          };
         },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return { data: null, error: { message: errorText } };
-      }
-
-      const data = await response.json();
-      return { data, error: null };
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      return { data: null, error: { message } };
-    }
-  }
-
-  private async executeMutation(
-    method: "POST" | "PATCH" | "DELETE",
-    body: Record<string, unknown>
-  ): Promise<ApiResponse<unknown>> {
-    try {
-      const params = new URLSearchParams();
-      params.set("table", this.table);
-
-      Object.entries(this.filters).forEach(([key, value]) => {
-        if (value !== undefined) {
-          params.set(`filter_${key}`, String(value));
-        }
-      });
-
-      const url = `${this.baseUrl}/db?${params.toString()}`;
-      const authToken = this.getAuthHeader();
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return { data: null, error: { message: errorText } };
-      }
-
-      const data = await response.json();
-      return { data, error: null };
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      return { data: null, error: { message } };
-    }
-  }
-
-  private getAuthHeader(): string | null {
-    return localStorage.getItem("auth_token");
-  }
-}
-
-export const supabase = new NeonDatabaseClient(API_BASE_URL);
+        execute: end,
+      }),
+      insert: (data: Record<string, unknown>) => ({
+        then: (resolve: any) => api("POST", `/db?table=${table}`, data).then(r => resolve(Array.isArray(r) ? { data: r[0] } : r)),
+        execute: async () => { const r = await api("POST", `/db?table=${table}`, data); return Array.isArray(r) ? { data: r[0], error: null } : r; },
+      }),
+    };
+  },
+  auth: {
+    signup: (email: string, password: string, fullName: string, role?: string) =>
+      api("POST", "/auth/signup", { email, password, fullName, role: role || "buyer" }),
+    login: (email: string, password: string) =>
+      api("POST", "/auth/login", { email, password }),
+    updateRole: (userId: string, newRole: string) =>
+      api("PATCH", "/auth/update-role", { userId, newRole }),
+  },
+};
